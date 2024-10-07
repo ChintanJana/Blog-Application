@@ -1,7 +1,8 @@
-from fastapi import status, APIRouter
+from fastapi import status, APIRouter, HTTPException
 from blog.database import SessionLocal
 from blog.schema.posts import PostBase
 from blog.database.models.posts import Post
+from sqlalchemy import select
 
 post_router = APIRouter(
     prefix = "/posts",
@@ -19,5 +20,14 @@ async def create_post(post: PostBase):
         session.commit()
         return f"Created {repr(db_post)}"
 
+@post_router.get("/get/{post_id}", status_code = status.HTTP_200_OK)
+async def get_post(post_id: int):
+    with SessionLocal() as session:
+        stmt = select(Post).where(Post.post_id == post_id)
+        result = session.execute(stmt)
 
+        if result is None:
+            raise HTTPException(status_code = 404, detail="Post doesn't exist.")
+        
+        return result.scalars().all()
     
