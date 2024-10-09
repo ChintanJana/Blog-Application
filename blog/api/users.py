@@ -2,7 +2,8 @@ from fastapi import status, APIRouter, HTTPException
 from blog.database import SessionLocal
 from blog.schema.users import UserBase
 from blog.database.models.users import User
-from sqlalchemy import select
+from sqlalchemy import select, update, delete 
+
 user_router = APIRouter(
     prefix = "/users",
     tags=["users"],
@@ -29,16 +30,32 @@ async def get_user(user_id: int):
             raise HTTPException(status_code=404, detail="User not found")
         return result.scalars().all()
 
-@user_router.put("/update/{user_id}", status_code=status.HTTP_200_OK)
-async def update_user(user_id: int, user: UserBase):
+@user_router.put("/update", status_code=status.HTTP_200_OK)
+async def update_post(user : UserBase):
+    user_id = user.user_id
     with SessionLocal() as session:
-        db_user = session.get(User, user_id)
-        if db_user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        # Update the fields
-        for key, value in user.model_dump().items():
-            setattr(db_user, key, value)
+        stmt = select(User.user_id).where(User.user_id == user_id)
+        result = session.execute(stmt).scalars().all()
 
+        if result is None:
+            HTTPException(status_code=404, detail="Post doesn't exist.")
+        
+    
+    updated_post = user.model_dump(exclude_unset=True)
+
+    with SessionLocal() as session:
+        stmt = update(User)
+        session.execute(stmt, updated_post)
         session.commit()
-        return f"Updated {repr(db_user)}"
+
+@user_router.get("/delete/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post(user_id: int):
+    with SessionLocal() as session:
+        try:
+            stmt = delete(User).where(User.user_id == user_id)
+            session.execute(stmt)
+        except:
+            session.rollback()
+            raise
+        else:
+            session.commit()
